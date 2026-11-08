@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <title>Simple Calculator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      background: #e2e8f0;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .calculator {
+      width: min(100%, 360px);
+      padding: 1.25rem;
+      border-radius: 1.25rem;
+      background: #0f172a;
+      box-shadow: 0 24px 60px rgb(15 23 42 / 25%);
+    }
+
+    h1 {
+      margin: 0 0 1rem;
+      color: #cbd5e1;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    #display {
+      width: 100%;
+      height: 5rem;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      border: 0;
+      border-radius: 0.75rem;
+      background: #1e293b;
+      color: #f8fafc;
+      font: inherit;
+      font-size: 2rem;
+      text-align: right;
+    }
+
+    .keys {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.65rem;
+    }
+
+    button {
+      min-height: 3.75rem;
+      border: 0;
+      border-radius: 0.75rem;
+      background: #334155;
+      color: #f8fafc;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1.2rem;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+
+    button:hover {
+      background: #475569;
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    button:focus-visible,
+    #display:focus-visible {
+      outline: 3px solid #38bdf8;
+      outline-offset: 2px;
+    }
+
+    .operator {
+      background: #1d4ed8;
+    }
+
+    .operator:hover {
+      background: #2563eb;
+    }
+
+    .utility {
+      background: #64748b;
+    }
+
+    .equals {
+      grid-row: span 2;
+      background: #059669;
+    }
+
+    .equals:hover {
+      background: #10b981;
+    }
+
+    .zero {
+      grid-column: span 2;
+    }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Calculator">
+    <h1>Simple Calculator</h1>
+    <input id="display" type="text" inputmode="decimal" aria-label="Calculator display" value="0" autocomplete="off">
+
+    <div class="keys">
+      <button class="utility" data-action="clear" aria-label="Clear">AC</button>
+      <button class="utility" data-action="delete" aria-label="Delete last digit">DEL</button>
+      <button class="operator" data-value="/" aria-label="Divide">÷</button>
+      <button class="operator" data-value="*" aria-label="Multiply">×</button>
+
+      <button data-value="7">7</button>
+      <button data-value="8">8</button>
+      <button data-value="9">9</button>
+      <button class="operator" data-value="-" aria-label="Subtract">−</button>
+
+      <button data-value="4">4</button>
+      <button data-value="5">5</button>
+      <button data-value="6">6</button>
+      <button class="operator" data-value="+" aria-label="Add">+</button>
+
+      <button data-value="1">1</button>
+      <button data-value="2">2</button>
+      <button data-value="3">3</button>
+      <button class="equals" data-action="equals" aria-label="Equals">=</button>
+
+      <button class="zero" data-value="0">0</button>
+      <button data-value=".">.</button>
+    </div>
+  </main>
+
+  <script>
+    const display = document.querySelector("#display");
+    const keys = document.querySelector(".keys");
+
+    function calculate(expression) {
+      const tokens = expression.match(/(?:\d*\.)?\d+|[+\-*/]/g);
+      if (!tokens || tokens.join("") !== expression.replace(/\s/g, "")) {
+        throw new Error("Invalid expression");
+      }
+
+      const values = [];
+      const operators = [];
+      const precedence = { "+": 1, "-": 1, "*": 2, "/": 2 };
+      let expectNumber = true;
+
+      for (const token of tokens) {
+        if (!Number.isNaN(Number(token))) {
+          if (!expectNumber) throw new Error("Invalid expression");
+          values.push(Number(token));
+          expectNumber = false;
+          continue;
+        }
+
+        if (expectNumber) {
+          if ((token === "-" || token === "+") && (values.length === 0 || operators.length > 0)) {
+            // Support a leading sign and signs after another operator.
+            if (token === "-") {
+              const next = tokens[tokens.indexOf(token) + 1];
+              if (next === undefined || Number.isNaN(Number(next))) throw new Error("Invalid expression");
+            }
+            // Unary signs are handled by folding them into the next numeric token below.
+            const index = tokens.indexOf(token);
+            const next = tokens[index + 1];
+            if (next === undefined || Number.isNaN(Number(next))) throw new Error("Invalid expression");
+            tokens[index + 1] = token === "-" ? String(-Number(next)) : next;
+            continue;
+          }
+          throw new Error("Invalid expression");
+        }
+
+        while (operators.length && precedence[operators.at(-1)] >= precedence[token]) {
+          applyOperator();
+        }
+        operators.push(token);
+        expectNumber = true;
+      }
+
+      if (expectNumber) throw new Error("Invalid expression");
+      while (operators.length) applyOperator();
+      if (values.length !== 1 || !Number.isFinite(values[0])) throw new Error("Invalid result");
+      return Number(values[0].toPrecision(12)).toString();
+
+      function applyOperator() {
+        const operator = operators.pop();
+        const right = values.pop();
+        const left = values.pop();
+        if (left === undefined || right === undefined) throw new Error("Invalid expression");
+        if (operator === "+") values.push(left + right);
+        if (operator === "-") values.push(left - right);
+        if (operator === "*") values.push(left * right);
+        if (operator === "/") {
+          if (right === 0) throw new Error("Cannot divide by zero");
+          values.push(left / right);
+        }
+      }
+    }
+
+    function append(value) {
+      const current = display.value === "0" || display.value === "Error" ? "" : display.value;
+      if ("+-*/".includes(value)) {
+        display.value = /[+\-*/]$/.test(current)
+          ? current.slice(0, -1) + value
+          : current + value;
+        return;
+      }
+      if (value === ".") {
+        const currentNumber = current.split(/[+\-*/]/).pop();
+        if (currentNumber.includes(".")) return;
+      }
+      display.value = current + value;
+    }
+
+    function showResult() {
+      try {
+        display.value = calculate(display.value);
+      } catch (error) {
+        display.value = error.message === "Cannot divide by zero" ? "Error" : "Error";
+      }
+    }
+
+    keys.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+
+      if (button.dataset.action === "clear") display.value = "0";
+      else if (button.dataset.action === "delete") display.value = display.value.slice(0, -1) || "0";
+      else if (button.dataset.action === "equals") showResult();
+      else append(button.dataset.value);
+    });
+
+    display.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === "=") {
+        event.preventDefault();
+        showResult();
+      } else if (event.key === "Escape") {
+        display.value = "0";
+      }
+    });
+  </script>
+</body>
+</html>
